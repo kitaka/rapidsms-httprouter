@@ -6,6 +6,7 @@ setup(
     license="BSD",
 
     install_requires = [
+        "django >= 1.4",
         "rapidsms >= 0.9.6a",
         "South",
         "requests",
