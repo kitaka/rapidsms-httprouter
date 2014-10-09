@@ -6,7 +6,7 @@ setup(
     license="BSD",
 
     install_requires = [
-        "rapidsms==0.9.6a",
+        "rapidsms >= 0.9.6a",
         "South",
         "requests",
     ],
