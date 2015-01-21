@@ -64,6 +64,10 @@ class Message(models.Model):
         max_length=64, null=True, blank=True,
         help_text="An arbitrary id which you can use to map ids assigned by an external backend to your local messages")
 
+    class Meta:
+        index_together = (
+            ('direction', 'date'),)
+
     def __unicode__(self):
         # crop the text (to avoid exploding the admin)
         if len(self.text) < 60:
