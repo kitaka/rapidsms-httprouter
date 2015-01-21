@@ -1,9 +1,7 @@
-import datetime
 
-from django.db import models, connections
-from django.db.models.query import QuerySet
+from django.db import models
 
-from rapidsms.models import Contact, Connection
+from rapidsms.models import Connection
 
 
 # Direction constants
@@ -46,37 +44,40 @@ STATUS_CHOICES = (
     (FAILED, "Failed")
 )
 
+
 class Message(models.Model):
     connection = models.ForeignKey(Connection, related_name='messages')
-    text       = models.TextField()
+    text = models.TextField()
 
-    direction  = models.CharField(max_length=1, choices=DIRECTION_CHOICES)
-    status     = models.CharField(max_length=1, choices=STATUS_CHOICES)
+    direction = models.CharField(max_length=1, choices=DIRECTION_CHOICES)
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES)
 
-    date       = models.DateTimeField(auto_now_add=True)
-    updated    = models.DateTimeField(auto_now=True, null=True)
+    date = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True, null=True)
 
-    sent       = models.DateTimeField(null=True, blank=True)
-    delivered  = models.DateTimeField(null=True, blank=True)
+    sent = models.DateTimeField(null=True, blank=True)
+    delivered = models.DateTimeField(null=True, blank=True)
 
     in_response_to = models.ForeignKey('self', related_name='responses', null=True, blank=True)
 
-    external_id = models.CharField(max_length=64, null=True, blank=True,
-                                   help_text="An arbitrary id which you can use to map ids assigned by an external backend to your local messages")
+    external_id = models.CharField(
+        max_length=64, null=True, blank=True,
+        help_text="An arbitrary id which you can use to map ids assigned by an external backend to your local messages")
 
     def __unicode__(self):
         # crop the text (to avoid exploding the admin)
-        if len(self.text) < 60: str = self.text
-        else: str = "%s..." % (self.text[0:57])
+        if len(self.text) < 60:
+            str = self.text
+        else:
+            str = "%s..." % (self.text[0:57])
 
         to_from = (self.direction == "I") and "to" or "from"
         return "%s (%s %s)" % (str, to_from, self.connection.identity)
 
     def as_json(self):
-        return dict(id=self.pk,
-                    contact=self.connection.identity, backend=self.connection.backend.name,
-                    direction=self.direction, status=self.status, text=self.text,
-                    date=self.date.isoformat())
+        return dict(
+            id=self.pk, contact=self.connection.identity, backend=self.connection.backend.name,
+            direction=self.direction, status=self.status, text=self.text, date=self.date.isoformat())
 
     def send(self):
         """
@@ -89,6 +90,7 @@ class Message(models.Model):
         # send this message off in celery
         send_message_task.delay(self.pk)
 
+
 class DeliveryError(models.Model):
     """
     Simple class to keep track of delivery errors for messages.  We retry up to three times before
@@ -99,4 +101,3 @@ class DeliveryError(models.Model):
     log = models.TextField(help_text="A short log on the error that was received when this message was delivered")
     created_on = models.DateTimeField(auto_now_add=True,
                                       help_text="When this delivery error occurred")
-
