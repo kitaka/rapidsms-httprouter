@@ -97,7 +97,7 @@ class HttpRouter(object, LoggerMixin):
         db_message = self.add_message(backend, sender, text, 'I', 'R')
 
         # and our rapidsms transient message for processing
-        msg = IncomingMessage(db_message.connection, text, db_message.date)
+        msg = IncomingMessage([db_message.connection], text, db_message.date)
         
         # add an extra property to IncomingMessage, so httprouter-aware
         # apps can make use of it during the handling phase
@@ -202,7 +202,7 @@ class HttpRouter(object, LoggerMixin):
         message which triggered it.
         """
         # add it to our outgoing queue
-        db_message = self.add_outgoing(msg.connection, msg.text, source, status='P')
+        db_message = self.add_outgoing(msg['connections'][0], msg['text'], source, status='P')
         return db_message
 
     def process_outgoing_phases(self, outgoing):
@@ -213,7 +213,7 @@ class HttpRouter(object, LoggerMixin):
         called with the message.  In that case this method will also return False
         """
         # create a RapidSMS outgoing message
-        msg = OutgoingMessage(outgoing.connection, outgoing.text.replace('%','%%'))
+        msg = OutgoingMessage([outgoing.connection], outgoing.text.replace('%','%%'))
         msg.db_message = outgoing
         
         send_msg = True
@@ -298,10 +298,6 @@ class HttpRouter(object, LoggerMixin):
         # add all our apps
         for app_name in settings.SMS_APPS:
             self.add_app(app_name)
-
-        # start all our apps
-        for app in self.apps:
-            app.start()
 
         # the list of messages which need to be sent, we load this from the DB
         # upon first starting up
