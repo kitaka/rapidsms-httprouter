@@ -6,7 +6,7 @@ from .views import receive, outbox, delivered, console, relaylog, alert, status
 from .textit import textit_webhook
 from django.contrib.admin.views.decorators import staff_member_required
 
-urlpatterns = patterns("",
+urlpatterns = [
    ("^router/status", status),
    ("^router/receive", receive),
    ("^router/outbox", outbox),
@@ -15,4 +15,4 @@ urlpatterns = patterns("",
    ("^router/delivered", delivered),
    ("^router/console", staff_member_required(console), {}, 'httprouter-console'),
    ("^router/textit", textit_webhook),
-)
+]
