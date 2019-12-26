@@ -46,7 +46,7 @@ STATUS_CHOICES = (
 
 
 class Message(models.Model):
-    connection = models.ForeignKey(Connection, related_name='messages')
+    connection = models.ForeignKey(Connection, related_name='messages', on_delete=models.CASCADE)
     text = models.TextField()
 
     direction = models.CharField(max_length=1, choices=DIRECTION_CHOICES)
@@ -58,7 +58,7 @@ class Message(models.Model):
     sent = models.DateTimeField(null=True, blank=True)
     delivered = models.DateTimeField(null=True, blank=True)
 
-    in_response_to = models.ForeignKey('self', related_name='responses', null=True, blank=True)
+    in_response_to = models.ForeignKey('self', related_name='responses', null=True, blank=True, on_delete=models.CASCADE)
 
     external_id = models.CharField(
         max_length=64, null=True, blank=True,
@@ -89,7 +89,7 @@ class Message(models.Model):
         is a soft one, as we only do the import of Tasks here.  If a user has ROUTER_URL
         set to NONE (say when using an Android relayer) then there is no need for Celery and friends.
         """
-        from tasks import send_message_task
+        from .tasks import send_message_task
 
         # send this message off in celery
         send_message_task.delay(self.pk)
@@ -101,7 +101,7 @@ class DeliveryError(models.Model):
     finally giving up on sending.
     """
     message = models.ForeignKey(Message, related_name='errors',
-                                help_text="The message that had an error")
+                                help_text="The message that had an error", on_delete=models.CASCADE)
     log = models.TextField(help_text="A short log on the error that was received when this message was delivered")
     created_on = models.DateTimeField(auto_now_add=True,
                                       help_text="When this delivery error occurred")

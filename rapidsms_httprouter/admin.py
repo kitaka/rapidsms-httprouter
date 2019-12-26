@@ -1,16 +1,18 @@
 from django.conf.urls import *
 from django.contrib import admin
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django import forms
 from django.http import HttpResponseRedirect
 from .models import Message
 from .router import get_router
 
+
 class MessageAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         urls = super(MessageAdmin, self).get_urls()
-        console_urls = patterns('', (r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send'))
+        console_urls = patterns('', (
+        r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send'))
         return console_urls + urls
 
     class SendForm(forms.Form):
@@ -31,20 +33,24 @@ class MessageAdmin(admin.ModelAdmin):
         if not extra_context:
             extra_context = dict()
         extra_context['title'] = "Messages"
-        
+
         return super(MessageAdmin, self).changelist_view(request, extra_context)
 
     def identity(self, obj):
-        return "<a href='?connection=%s&q=%s'>%s</a>" % (obj.connection.id, obj.connection.identity, obj.connection.identity)
+        return "<a href='?connection=%s&q=%s'>%s</a>" % (
+        obj.connection.id, obj.connection.identity, obj.connection.identity)
+
     identity.short_description = "Phone"
     identity.allow_tags = True
 
     def backend(self, obj):
         return obj.connection.backend.name
+
     backend.short_description = "Backend"
 
     def sms_dir(self, obj):
         return "<div class='" + obj.direction + "'></div>"
+
     sms_dir.short_description = ""
     sms_dir.allow_tags = True
 
@@ -61,6 +67,7 @@ class MessageAdmin(admin.ModelAdmin):
         css = {
             "all": ("rapidsms_httprouter/stylesheets/admin.css",)
         }
+
 
 admin.site.register(Message, MessageAdmin)
 

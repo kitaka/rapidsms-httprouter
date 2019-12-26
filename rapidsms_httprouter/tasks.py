@@ -1,20 +1,17 @@
-import StringIO
-from celery.task import task
-from datetime import datetime, timedelta
-from django.conf import settings
-from urllib import quote_plus
-from urllib2 import urlopen
-import traceback
-import time
-import re
-import redis
-
 import logging
+from datetime import datetime, timedelta
+from urllib.parse import quote_plus
+
+import redis
+from celery.task import task
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
-from .models import Message, DeliveryError, QUEUED, ERRORED, DISPATCHED, SENT, FAILED, OUTGOING, INCOMING
+from .models import Message, DeliveryError, QUEUED, ERRORED, DISPATCHED, SENT, FAILED, OUTGOING
 from .router import HttpRouter
 from .textit import lookup_textit_backend_by_name, send_textit_message
+
 
 def fetch_url(url, params):
     if hasattr(settings, 'ROUTER_FETCH_URL'):
@@ -22,6 +19,7 @@ def fetch_url(url, params):
         return fetch_url(url, params)
     else:
         return HttpRouter.fetch_url(url, params)
+
 
 def build_send_url(params, **kwargs):
     """
@@ -34,7 +32,7 @@ def build_send_url(params, **kwargs):
             params[k] = quote_plus(str(v))
         except UnicodeEncodeError:
             params[k] = quote_plus(str(v.encode('UTF-8')))
-            
+
     # get our router URL
     router_url = settings.ROUTER_URL
 
@@ -42,23 +40,25 @@ def build_send_url(params, **kwargs):
     if type(router_url) is dict:
         router_dict = router_url
         backend_name = params['backend']
-            
+
         # is there an entry for this backend?
         if backend_name in router_dict:
             router_url = router_dict[backend_name]
 
-        # if not, look for a default backend 
+        # if not, look for a default backend
         elif 'default' in router_dict:
             router_url = router_dict['default']
 
         # none?  blow the hell up
         else:
-            self.error("No router url mapping found for backend '%s', check your settings.ROUTER_URL setting" % backend_name)
-            raise Exception("No router url mapping found for backend '%s', check your settings.ROUTER_URL setting" % backend_name)
+            # self.error("No router url mapping found for backend '%s', check your settings.ROUTER_URL setting" % backend_name)
+            raise Exception(
+                "No router url mapping found for backend '%s', check your settings.ROUTER_URL setting" % backend_name)
 
     # return our built up url with all our variables substituted in
     full_url = router_url % params
     return full_url
+
 
 def send_message(msg, **kwargs):
     """
@@ -66,7 +66,7 @@ def send_message(msg, **kwargs):
     """
     msg_log = "Sending message: [%d]\n" % msg.id
 
-    print "[%d] >> %s\n" % (msg.id, msg.text)
+    print("[%d] >> %s\n" % (msg.id, msg.text))
 
     try:
         # if this is a textit backend
@@ -74,7 +74,7 @@ def send_message(msg, **kwargs):
         if textit_backend:
             # deliver there
             ids = send_textit_message(msg.connection.backend.name, [msg.connection.identity], msg.text)
-            
+
             # TODO: bulk messaging?
             if ids:
                 msg.external_id = ids[0]
@@ -96,9 +96,9 @@ def send_message(msg, **kwargs):
             }
 
             url = build_send_url(params)
-            print "[%d] - %s\n" % (msg.id, url)
+            print("[%d] - %s\n" % (msg.id, url))
             msg_log += "%s %s\n" % (msg.connection.backend.name, url)
-            
+
             response = fetch_url(url, params)
             status_code = response.getcode()
 
@@ -109,8 +109,8 @@ def send_message(msg, **kwargs):
 
             # kannel likes to send 202 responses, really any
             # 2xx value means things went okay
-            if int(status_code/100) == 2:
-                print "  [%d] - sent %d" % (msg.id, status_code)
+            if int(status_code / 100) == 2:
+                print("  [%d] - sent %d" % (msg.id, status_code))
                 logger.info("SMS[%d] SENT" % msg.id)
                 msg.sent = datetime.now()
                 msg.status = SENT
@@ -121,13 +121,13 @@ def send_message(msg, **kwargs):
                 raise Exception("Received status code: %d" % status_code)
 
     except Exception as e:
-        print "  [%d] - send error - %s" % (msg.id, str(e))
+        print("  [%d] - send error - %s" % (msg.id, str(e)))
 
         # previous errors
         previous_count = DeliveryError.objects.filter(message=msg).count()
-        msg_log += "Failure #%d\n\n" % (previous_count+1)
+        msg_log += "Failure #%d\n\n" % (previous_count + 1)
         msg_log += "Error: %s\n\n" % str(e)
-        
+
         if previous_count >= 2:
             msg_log += "Permanent failure, will not retry."
             msg.status = FAILED
@@ -141,18 +141,19 @@ def send_message(msg, **kwargs):
 
     return None
 
+
 @task(track_started=True)
-def send_message_task(message_id):  #pragma: no cover
+def send_message_task(message_id):  # pragma: no cover
     # noop if there is no ROUTER_URL
     if not getattr(settings, 'ROUTER_URL', None):
-        print "  [%d] - no ROUTER_URL configured, ignoring" % message_id
+        print("  [%d] - no ROUTER_URL configured, ignoring" % message_id)
 
     # we use redis to acquire a global lock based on our settings key
     r = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB)
 
     # try to acquire a lock, at most it will last 60 seconds
     with r.lock('send_message_%d' % message_id, timeout=60):
-        print "  [%d] - sending message" % message_id
+        print("  [%d] - sending message" % message_id)
 
         # get the message
         msg = Message.objects.get(pk=message_id)
@@ -160,15 +161,16 @@ def send_message_task(message_id):  #pragma: no cover
         # if it hasn't been sent and it needs to be sent
         if msg.status == QUEUED or msg.status == ERRORED:
             status = send_message(msg)
-            print "  [%d] - msg sent status: %s" % (message_id, status)
+            print("  [%d] - msg sent status: %s" % (message_id, status))
+
 
 @task(track_started=True)
-def resend_errored_messages_task():  #pragma: no cover
+def resend_errored_messages_task():  # pragma: no cover
     # noop if there is no ROUTER_URL
     if not getattr(settings, 'ROUTER_URL', None):
-        print "--resending errors-- no ROUTER_URL configured, ignoring"
+        print("--resending errors-- no ROUTER_URL configured, ignoring")
 
-    print "-- resending errors --"
+    print("-- resending errors --")
 
     # we use redis to acquire a global lock based on our settings key
     r = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB)
@@ -182,11 +184,11 @@ def resend_errored_messages_task():  #pragma: no cover
         count = 0
         for msg in pending:
             msg.send()
-            count+=1
+            count += 1
 
             if count >= 100: break
 
-        print "-- resent %d errored messages --" % count
+        print("-- resent %d errored messages --" % count)
 
         # and all queued messages that are older than 2 minutes
         three_minutes_ago = datetime.now() - timedelta(minutes=3)
@@ -196,10 +198,10 @@ def resend_errored_messages_task():  #pragma: no cover
         count = 0
         for msg in pending:
             msg.send()
-            count+=1
+            count += 1
 
             if count >= 100: break
 
-        print "-- resent %d pending messages -- " % count
+        print("-- resent %d pending messages -- " % count)
 
 

@@ -2,13 +2,14 @@ from django import forms
 from django.http import HttpResponse
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from urlparse import urlparse
+import urllib
 
 from .models import Message, SENT, FAILED, DELIVERED
 from .router import get_router
 
 import requests
 import json
+
 
 def parse_textit_router_url(router_url):
     """
@@ -22,10 +23,10 @@ def parse_textit_router_url(router_url):
 
     if textit_offset > 0:
         # parse the url
-        parsed = urlparse(router_url)
+        parsed = urllib.parse(router_url)
 
         if not parsed.username or not parsed.password:
-            raise Exception("Invalid configuration for TextIt endpoint, must be in the format: "\
+            raise Exception("Invalid configuration for TextIt endpoint, must be in the format: " \
                             "'http://[phone]:[api_token]@textit.in/api/v1' was '%s'" % router_url)
 
         # strip the + for consistency.. most will probably forget to URL encode it anyways
@@ -36,6 +37,7 @@ def parse_textit_router_url(router_url):
 
     # this isn't a textit URL, nothing to see here
     return None
+
 
 # lazy loaded caches since these two lookups are very common
 __backends_by_name = dict()
@@ -58,7 +60,7 @@ def lookup_textit_backend_by_phone(phone):
     for backend in settings.ROUTER_URL.keys():
         router_url = settings.ROUTER_URL[backend]
         router_backend = parse_textit_router_url(router_url)
-        
+
         if router_backend and router_backend['phone'] == phone:
             textit_backend = router_backend
             textit_backend['name'] = backend
@@ -82,12 +84,13 @@ def lookup_textit_backend_by_name(name):
         router_url = settings.ROUTER_URL.get(name, None)
 
     if router_url:
-	textit_backend = parse_textit_router_url(router_url)
+        textit_backend = parse_textit_router_url(router_url)
         if textit_backend:
             textit_backend['name'] = name
 
     __backends_by_name[name] = textit_backend
     return textit_backend
+
 
 @csrf_exempt
 def textit_webhook(request):
@@ -129,7 +132,8 @@ def textit_webhook(request):
 
                 # didn't find it, that's our error, not TextIts, so just say we ignored it
                 else:
-                    json_response['status'] = "no backend found for relayer_phone '%s', ignoring" % data['relayer_phone']
+                    json_response['status'] = "no backend found for relayer_phone '%s', ignoring" % data[
+                        'relayer_phone']
 
             # this is a sent report
             elif event == 'mt_sent':
@@ -139,7 +143,7 @@ def textit_webhook(request):
                 if message:
                     message.update(status=SENT)
                     json_response['status'] = "message marked as sent"
-                    
+
                 else:
                     json_response['status'] = "unknown message"
 
@@ -213,12 +217,13 @@ def send_textit_message(backend, contacts, message):
     # look up the textit router for this backend
     textit_backend = lookup_textit_backend_by_name(backend)
     if not textit_backend:
-        raise Exception("Unable to find a TextIt backend with name '%s', check ROUTER_URL in your settings.py" % backend)
-    
+        raise Exception(
+            "Unable to find a TextIt backend with name '%s', check ROUTER_URL in your settings.py" % backend)
+
     # build our request
     payload = dict(text=message, phone=contacts)
-    headers = { 'Authorization': 'Token %s' % textit_backend['token'],
-                'Content-Type': 'application/json' }
+    headers = {'Authorization': 'Token %s' % textit_backend['token'],
+               'Content-Type': 'application/json'}
 
     # send things off, raising an exception if we don't get a 200
     r = requests.post(TEXTIT_SEND_URL, data=json.dumps(payload), headers=headers)

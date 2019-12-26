@@ -6,15 +6,16 @@ from rapidsms.apps.base import AppBase
 from rapidsms.messages.incoming import IncomingMessage
 from rapidsms.messages.outgoing import OutgoingMessage
 import logging
+
 logger = logging.getLogger(__name__)
 from threading import Lock, Thread
 
-from urllib import quote_plus
-from urllib2 import urlopen
+from urllib.request import urlopen
 import time
 import re
 import datetime
 import traceback
+
 
 class HttpRouter(object):
     """
@@ -42,7 +43,7 @@ class HttpRouter(object):
             response = urlopen(url, timeout=15)
         else:
             response = urlopen(url, " ", timeout=15)
-        
+
         return response
 
     @classmethod
@@ -59,7 +60,7 @@ class HttpRouter(object):
         tied to it.
         """
         # lookup / create this backend
-        # TODO: is this too flexible?  Perhaps we should do this upon initialization and refuse 
+        # TODO: is this too flexible?  Perhaps we should do this upon initialization and refuse
         # any backends not found in our settings.  But I hate dropping messages on the floor.
         backend, created = Backend.objects.get_or_create(name=backend)
         contact = HttpRouter.normalize_number(contact)
@@ -74,7 +75,7 @@ class HttpRouter(object):
             connection = connection[0]
 
         # force to unicode
-        text = unicode(text)
+        text = str(text)
         message = Message.objects.create(connection=connection,
                                          text=text,
                                          direction=direction,
@@ -99,11 +100,11 @@ class HttpRouter(object):
 
         # and our rapidsms transient message for processing
         msg = IncomingMessage([db_message.connection], text, db_message.date)
-        
+
         # add an extra property to IncomingMessage, so httprouter-aware
         # apps can make use of it during the handling phase
         msg.db_message = db_message
-        
+
         logger.info("SMS[%d] IN (%s) : %s" % (db_message.id, msg.connection, msg.text))
         try:
             for phase in self.incoming_phases:
@@ -121,7 +122,7 @@ class HttpRouter(object):
                         func = getattr(app, phase)
                         handled = func(msg)
 
-                    except Exception, err:
+                    except Exception as err:
                         import traceback
                         traceback.print_exc(err)
                         app.exception()
@@ -131,7 +132,7 @@ class HttpRouter(object):
                     if phase == "filter":
                         if handled is True:
                             logger.warning("Message filtered")
-                            raise(StopIteration)
+                            raise (StopIteration)
 
                     # during the _handle_ phase, apps can return True
                     # to "short-circuit" this phase, preventing any
@@ -139,24 +140,24 @@ class HttpRouter(object):
                     elif phase == "handle":
                         if handled is True:
                             logger.debug("Short-circuited")
-                            # mark the message handled to avoid the 
+                            # mark the message handled to avoid the
                             # default phase firing unnecessarily
                             msg.handled = True
                             break
-                    
+
                     elif phase == "default":
                         # allow default phase of apps to short circuit
-                        # for prioritized contextual responses.   
+                        # for prioritized contextual responses.
                         if handled is True:
                             logger.debug("Short-circuited default")
                             break
-                        
+
         except StopIteration:
             pass
 
         db_message.status = 'H'
         db_message.save()
-        
+
         db_responses = []
 
         # now send the message responses
@@ -170,13 +171,12 @@ class HttpRouter(object):
 
         return db_message
 
-
     def add_outgoing(self, connection, text, source=None, status='Q'):
         """
         Adds a message to our outgoing queue, this is a non-blocking action
         """
         db_message = Message.objects.create(connection=connection,
-                                            text=unicode(text),
+                                            text=str(text),
                                             direction='O',
                                             status=status,
                                             in_response_to=source)
@@ -196,7 +196,7 @@ class HttpRouter(object):
             db_message.send()
 
         return db_message
-                
+
     def handle_outgoing(self, msg, source=None):
         """
         Sends the passed in RapidSMS message off.  Optionally ties the outgoing message to the incoming
@@ -214,9 +214,9 @@ class HttpRouter(object):
         called with the message.  In that case this method will also return False
         """
         # create a RapidSMS outgoing message
-        msg = OutgoingMessage([outgoing.connection], outgoing.text.replace('%','%%'))
+        msg = OutgoingMessage([outgoing.connection], outgoing.text.replace('%', '%%'))
         msg.db_message = outgoing
-        
+
         send_msg = True
         for phase in self.outgoing_phases:
             logger.debug("Out %s phase" % phase)
@@ -235,7 +235,7 @@ class HttpRouter(object):
                     # None from outgoing()
                     if keep_sending is False:
                         send_msg = False
-                except Exception, err:
+                except Exception as err:
                     app.exception()
 
                 # during any outgoing phase, an app can return True to
@@ -290,7 +290,6 @@ class HttpRouter(object):
         self.apps.append(app)
         return app
 
-
     def start(self):
         """
         Initializes our router.
@@ -306,10 +305,12 @@ class HttpRouter(object):
 
         # mark ourselves as started
         self.started = True
-        
+
+
 # we'll get started when we first get used
 http_router = HttpRouter()
 http_router_lock = Lock()
+
 
 def get_router():
     """
