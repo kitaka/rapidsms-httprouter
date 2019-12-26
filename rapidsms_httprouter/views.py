@@ -1,25 +1,18 @@
+import datetime
 import json
 
 from django import forms
-from django.http import HttpResponse
-from django.template import RequestContext
-from django.shortcuts import render_to_response
 from django.conf import settings
-from django.db.models import Q
-from django.core.paginator import *
+from django.core.mail import send_mail
+from django.http import HttpResponse
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from rapidsms.messages.outgoing import OutgoingMessage
-from rapidsms.models import Connection
-from djtables import Table, Column
-from djtables.column import DateColumn
-
-from django.core.mail import send_mail
-import datetime
-
 from .models import Message
 from .router import get_router
+
 
 class SecureForm(forms.Form):
     """
@@ -158,16 +151,16 @@ def delivered(request):
     return HttpResponse(json.dumps(dict(status="Message marked as sent.")))
 
 
-class MessageTable(Table):
-    # this is temporary, until i fix ModelTable!
-    text = Column()
-    direction = Column()
-    connection = Column(link=lambda cell: "javascript:reply('%s')" % cell.row.connection.identity)
-    status = Column()
-    date = DateColumn(format="m/d/Y H:i:s")
-
-    class Meta:
-        order_by = '-date'
+# class MessageTable(Table):
+#     # this is temporary, until i fix ModelTable!
+#     text = Column()
+#     direction = Column()
+#     connection = Column(link=lambda cell: "javascript:reply('%s')" % cell.row.connection.identity)
+#     status = Column()
+#     date = DateColumn(format="m/d/Y H:i:s")
+#
+#     class Meta:
+#         order_by = '-date'
 
 
 class SendForm(forms.Form):
@@ -193,70 +186,70 @@ def status(request):
 
     return render_to_response("router/status.html", dict(pending_count=pending_count),context_instance=RequestContext(request))
 
-def console(request):
-    """
-    Our web console, lets you see recent messages as well as send out new ones for
-    processing.
-    """
-    form = SendForm()
-    reply_form = ReplyForm()
-    search_form = SearchForm()
-
-    queryset = Message.objects.all()
-
-    if request.method == 'POST':
-        if request.REQUEST['action'] == 'test':
-            form = SendForm(request.POST)
-            if form.is_valid():
-                backend = "console"
-                message = get_router().handle_incoming(backend,
-                                                       form.cleaned_data['sender'],
-                                                       form.cleaned_data['text'])
-            reply_form = ReplyForm()
-
-        elif request.REQUEST['action'] == 'reply':
-            reply_form = ReplyForm(request.POST)
-            if reply_form.is_valid():
-                if Connection.objects.filter(identity=reply_form.cleaned_data['recipient']).count():
-                    text = reply_form.cleaned_data['message']
-                    conn = Connection.objects.filter(identity=reply_form.cleaned_data['recipient'])[0]
-                    outgoing = OutgoingMessage(conn, text)
-                    get_router().handle_outgoing(outgoing)
-                else:
-                    reply_form.errors.setdefault('short_description', ErrorList())
-                    reply_form.errors['recipient'].append("This number isn't in the system")
-
-    if request.REQUEST.get('action', None) == 'search':
-        # split on spaces
-        search_form = SearchForm(request.REQUEST)
-        if search_form.is_valid():
-            terms = search_form.cleaned_data['search'].split()
-
-            if terms:
-                term = terms[0]
-                query = (Q(text__icontains=term) | Q(in_response_to__text__icontains=term) | Q(connection__identity__icontains=term))
-                for term in terms[1:]:
-                    query &= (Q(text__icontains=term) | Q(in_response_to__text__icontains=term) | Q(connection__identity__icontains=term))
-
-                queryset = queryset.filter(query)
-
-    paginator = Paginator(queryset.order_by('-id'), 20)
-    page = request.REQUEST.get('page')
-    try:
-        messages = paginator.page(page)
-    except EmptyPage:
-        # If page is out of range (e.g. 9999), deliver last page of results.
-        messages = paginator.page(paginator.num_pages)
-    except:
-        # None or not an integer, default to first page
-        messages = paginator.page(1)
-
-    return render_to_response(
-        "router/index.html", {
-            "messages_table": MessageTable(queryset, request=request),
-            "form": form,
-            "reply_form": reply_form,
-            "search_form": search_form,
-            "sms_messages": messages
-        }, context_instance=RequestContext(request)
-    )
+# def console(request):
+#     """
+#     Our web console, lets you see recent messages as well as send out new ones for
+#     processing.
+#     """
+#     form = SendForm()
+#     reply_form = ReplyForm()
+#     search_form = SearchForm()
+#
+#     queryset = Message.objects.all()
+#
+#     if request.method == 'POST':
+#         if request.REQUEST['action'] == 'test':
+#             form = SendForm(request.POST)
+#             if form.is_valid():
+#                 backend = "console"
+#                 message = get_router().handle_incoming(backend,
+#                                                        form.cleaned_data['sender'],
+#                                                        form.cleaned_data['text'])
+#             reply_form = ReplyForm()
+#
+#         elif request.REQUEST['action'] == 'reply':
+#             reply_form = ReplyForm(request.POST)
+#             if reply_form.is_valid():
+#                 if Connection.objects.filter(identity=reply_form.cleaned_data['recipient']).count():
+#                     text = reply_form.cleaned_data['message']
+#                     conn = Connection.objects.filter(identity=reply_form.cleaned_data['recipient'])[0]
+#                     outgoing = OutgoingMessage(conn, text)
+#                     get_router().handle_outgoing(outgoing)
+#                 else:
+#                     reply_form.errors.setdefault('short_description', ErrorList())
+#                     reply_form.errors['recipient'].append("This number isn't in the system")
+#
+#     if request.REQUEST.get('action', None) == 'search':
+#         # split on spaces
+#         search_form = SearchForm(request.REQUEST)
+#         if search_form.is_valid():
+#             terms = search_form.cleaned_data['search'].split()
+#
+#             if terms:
+#                 term = terms[0]
+#                 query = (Q(text__icontains=term) | Q(in_response_to__text__icontains=term) | Q(connection__identity__icontains=term))
+#                 for term in terms[1:]:
+#                     query &= (Q(text__icontains=term) | Q(in_response_to__text__icontains=term) | Q(connection__identity__icontains=term))
+#
+#                 queryset = queryset.filter(query)
+#
+#     paginator = Paginator(queryset.order_by('-id'), 20)
+#     page = request.REQUEST.get('page')
+#     try:
+#         messages = paginator.page(page)
+#     except EmptyPage:
+#         # If page is out of range (e.g. 9999), deliver last page of results.
+#         messages = paginator.page(paginator.num_pages)
+#     except:
+#         # None or not an integer, default to first page
+#         messages = paginator.page(1)
+#
+#     return render_to_response(
+#         "router/index.html", {
+#             "messages_table": MessageTable(queryset, request=request),
+#             "form": form,
+#             "reply_form": reply_form,
+#             "search_form": search_form,
+#             "sms_messages": messages
+#         }, context_instance=RequestContext(request)
+#     )

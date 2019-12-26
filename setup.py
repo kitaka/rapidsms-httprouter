@@ -10,7 +10,7 @@ setup(
         "rapidsms >= 0.9.6a",
         "South",
         "requests",
-        "djtables",
+        # "djtables",
     ],
 
     description='Provides HTTP endpoints for a RapidSMS router, doing all handling in the Django thread.',

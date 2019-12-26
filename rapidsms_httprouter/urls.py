@@ -13,6 +13,6 @@ urlpatterns = [
    url("^router/relaylog", relaylog),
    url("^router/alert", alert),
    url("^router/delivered", delivered),
-   url("^router/console", staff_member_required(console), {}, 'httprouter-console'),
+   # url("^router/console", staff_member_required(console), {}, 'httprouter-console'),
    url("^router/textit", textit_webhook),
 ]
