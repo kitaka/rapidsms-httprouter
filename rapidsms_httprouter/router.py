@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 from threading import Lock, Thread
 
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 import time
 import re
 import datetime
@@ -40,7 +40,13 @@ class HttpRouter(object):
         in some cases apps may monkey patch this to deal with secondary urls.
         """
         if getattr(settings, 'ROUTER_HTTP_METHOD', 'GET') == 'GET':
-            response = urlopen(url, timeout=15)
+            # A patch for the MoveSMS Api that expects a User Agent
+            if 'sms.movesms' in url:
+                req = Request(url)
+                req.add_header('User-Agent', 'TracFM')
+                response = urlopen(req, timeout=15)
+            else:
+                response = urlopen(url, timeout=15)
         else:
             response = urlopen(url, " ", timeout=15)
 
