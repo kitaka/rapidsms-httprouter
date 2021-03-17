@@ -209,7 +209,11 @@ class HttpRouter(object):
         message which triggered it.
         """
         # add it to our outgoing queue
-        db_message = self.add_outgoing(msg['connections'][0], msg['text'], source, status='P')
+        # @TODO Felix the duplication can be eliminated with a bit of research
+        if hasattr(msg, '__getitem__'):
+            db_message = self.add_outgoing(msg['connections'][0], msg['text'], source, status='P')
+        else:
+            db_message = self.add_outgoing(msg.connections, msg.text, source, status='P')
         return db_message
 
     def process_outgoing_phases(self, outgoing):
