@@ -8,8 +8,8 @@ from django.contrib.admin.views.decorators import staff_member_required
 
 urlpatterns = [
    url("^router/status", status),
-   url("^router/receive", receive),
    url("^router/receive_post", receive_post),
+   url("^router/receive", receive),
    url("^router/outbox", outbox),
    url("^router/relaylog", relaylog),
    url("^router/alert", alert),
