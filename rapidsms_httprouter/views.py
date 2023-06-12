@@ -74,7 +74,10 @@ def receive(request):
 
 @csrf_exempt
 def receive_post(request):
-    form = MessageForm(request.POST)
+    params = request.GET 
+    params["sender"] = request.POST["from"]
+    params["message"]= request.POST["text"]
+    form = MessageForm(params)
     return process_router_form(form)
 
 
