@@ -40,13 +40,8 @@ class MessageForm(SecureForm):
 class OutboxForm(SecureForm):
     backend = forms.CharField(max_length=32, required=False)
 
-def receive(request):
-    """
-    Takes the passed in message.  Creates a record for it, and passes it through
-    all the rapidsms applications for processing.
-    """
-    form = MessageForm(request.GET)
 
+def process_router_form(form):
     # missing fields, fail
     if not form.is_valid():
         return HttpResponse(str(form.errors), status=400)
@@ -66,6 +61,21 @@ def receive(request):
         return HttpResponse()
     else:
         return HttpResponse(json.dumps(response))
+    
+
+def receive(request):
+    """
+    Takes the passed in message.  Creates a record for it, and passes it through
+    all the rapidsms applications for processing.
+    """
+    form = MessageForm(request.GET)
+    return process_router_form(form)
+
+
+@csrf_exempt
+def receive_post(request):
+    form = MessageForm(request.POST)
+    return process_router_form(form)
 
 
 @csrf_exempt
