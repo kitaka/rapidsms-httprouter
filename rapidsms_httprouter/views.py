@@ -75,6 +75,7 @@ def receive(request):
 @csrf_exempt
 def receive_post(request):
     params = request.GET 
+    params._mutable = True
     params["sender"] = request.POST["from"]
     params["message"]= request.POST["text"]
     form = MessageForm(params)
