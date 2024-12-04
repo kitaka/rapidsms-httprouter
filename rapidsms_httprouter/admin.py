@@ -1,6 +1,6 @@
 from django.conf.urls import *
 from django.contrib import admin
-from django.urls import reverse
+from django.urls import reverse, re_path
 from django import forms
 from django.http import HttpResponseRedirect
 from .models import Message
@@ -11,8 +11,15 @@ class MessageAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         urls = super(MessageAdmin, self).get_urls()
-        console_urls = patterns('', (
-        r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send'))
+        # console_urls = patterns('', (
+        # r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send'))
+        console_urls = [
+            re_path(
+                r'^send/$', 
+                self.admin_site.admin_view(self.send), 
+                name='rapidsms_httprouter_message_send'
+            ),
+        ]
         return console_urls + urls
 
     class SendForm(forms.Form):
